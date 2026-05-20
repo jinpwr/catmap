@@ -611,14 +611,3 @@ html, body {
 .board-card, .board-text {
   animation: card-spawn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-
-
-.tool-label,.toolbar-logo{display:none !important;}
-.tool-btn{width:44px;padding:10px 4px;}
-.board-card{box-shadow:none !important;border-width:2px !important;}
-.board-card:hover,.board-card.selected,.board-card.connect-source{box-shadow:none !important;}
-.board-card.dragging,.board-text.dragging{opacity:.92;cursor:grabbing;}
-.card-tag{text-transform:none !important;letter-spacing:0 !important;}
-.fold-toggle{width:18px;height:18px;border:none;background:transparent;color:var(--text-dim);cursor:pointer;font-family:var(--mono);font-size:12px;}
-.board-card.folded .card-tags,.board-card.folded .card-body{display:none;}
-.selection-box{position:absolute;border:1px dashed var(--accent);background:rgba(79,127,255,.08);pointer-events:none;z-index:999;}

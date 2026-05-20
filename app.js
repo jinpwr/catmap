@@ -283,7 +283,7 @@
     const id = data?.id || uid();
     const elData = data || {
       id, type: 'card',
-      x: x + 16, y: y + 16,
+      x: x - 110, y: y - 70,
       w: 240, h: 160,
       color: state.activeColor,
       title: '',
@@ -298,13 +298,12 @@
 
     const el = document.createElement('div');
     el.className = 'board-card no-pan';
-    el.style.borderColor = elData.color;
     el.dataset.id = id;
     el.style.cssText = `left:${elData.x}px;top:${elData.y}px;width:${elData.w}px;height:${elData.h}px;`;
 
     el.innerHTML = `
       <div class="card-header" style="background:${colorToHeaderBg(elData.color)}">
-        <button class="fold-toggle">−</button>
+        <div class="card-header-dot" style="background:${elData.color}"></div>
         <div class="card-title" contenteditable="true" spellcheck="false">${escHtml(elData.title)}</div>
       </div>
       <div class="card-tags" data-tags-container></div>
@@ -328,8 +327,6 @@
       ed.addEventListener('blur', () => saveElementContent(id));
     });
 
-    const foldBtn = el.querySelector('.fold-toggle');
-    foldBtn.addEventListener('click',(e)=>{e.stopPropagation();el.classList.toggle('folded');foldBtn.textContent=el.classList.contains('folded')?'+':'−';scheduleLineUpdate();});
     return el;
   }
 
@@ -395,11 +392,11 @@
         renderTags(cardEl, s.tags);
       } else if (val !== '' && myIdx >= s.tags.length) {
         // It was the placeholder with text — add as new tag
-        s.tags.push(val.toLowerCase());
+        s.tags.push(val);
         renderTags(cardEl, s.tags);
       } else if (val !== '') {
         // Update existing
-        s.tags[myIdx] = val.toLowerCase();
+        s.tags[myIdx] = val;
       }
       saveState();
     });
@@ -412,9 +409,9 @@
     const allTags = [...cardEl.querySelectorAll('[data-tags-container] .card-tag')];
     const myIdx = allTags.indexOf(span);
     if (myIdx >= s.tags.length) {
-      s.tags.push(val.toLowerCase());
+      s.tags.push(val);
     } else {
-      s.tags[myIdx] = val.toLowerCase();
+      s.tags[myIdx] = val;
     }
     renderTags(cardEl, s.tags);
     // Focus the new placeholder tag
@@ -478,7 +475,7 @@
     const id = data?.id || uid();
     const elData = data || {
       id, type: 'text',
-      x: x + 16, y: y + 16,
+      x: x - 60, y: y - 15,
       w: 200, h: 40,
       color: state.activeColor,
       content: '',
@@ -538,8 +535,6 @@
           dragging = true;
           clickNotDrag = false;
           el.classList.add('dragging');
-          el.style.boxShadow = `0 0 0 2px ${s.color}55, 0 0 32px ${s.color}88`;
-          el.style.boxShadow = `0 0 0 2px ${s.color}55, 0 0 32px ${s.color}88`;
           bringToFront(el);
           // Blur any focused editable inside so it stops being editable mid-drag
           const focused = el.querySelector(':focus');
@@ -561,7 +556,6 @@
         document.removeEventListener('mouseup', onUp);
         if (dragging) {
           el.classList.remove('dragging');
-          el.style.boxShadow='';
           dragging = false;
           saveState();
           scheduleLineUpdate();
@@ -633,7 +627,6 @@
         document.removeEventListener('mouseup', onUp);
         if (dragging) {
           el.classList.remove('dragging');
-          el.style.boxShadow='';
           dragging = false;
           saveState();
           scheduleLineUpdate();
@@ -814,8 +807,8 @@
     );
     if (exists) return;
     const connId = uid();
-    state.connections.push({ id: connId, fromId, toId, color: '#000000' });
-    drawLine(connId, fromId, toId, '#000000');
+    state.connections.push({ id: connId, fromId, toId, color: state.activeColor });
+    drawLine(connId, fromId, toId, state.activeColor);
     saveState();
   }
 
@@ -829,14 +822,14 @@
     }
     try {
       const line = new LeaderLine(fromEl, toEl, {
-        color: color || '#000000',
+        color: color || '#4F7FFF',
         size: 2,
-        path: 'straight',
+        path: 'fluid',
         startPlug: 'disc',
-        endPlug: 'disc',
+        endPlug: 'arrow2',
         startPlugSize: 1.5,
         endPlugSize: 1.8,
-        
+        dropShadow: { dx: 0, dy: 1, blur: 4, color: 'rgba(0,0,0,0.3)' },
       });
       state.lineInstances[connId] = line;
     } catch (e) { console.warn('LeaderLine error:', e); }
@@ -928,7 +921,7 @@
         const el = canvas.querySelector(`[data-id="${id}"]`);
         if (el) {
           el.querySelector('.card-header').style.background = colorToHeaderBg(color);
-          el.style.borderColor = color;
+          el.querySelector('.card-header-dot').style.background = color;
         }
       } else if (s.type === 'text') {
         const el = canvas.querySelector(`[data-id="${id}"]`);
@@ -1014,39 +1007,6 @@
 
     setInterval(redrawAllLines, 200);
   }
-
-
-  /* drag select */
-  let selectionBox=null,selectStart=null;
-  canvasContainer.addEventListener('mousedown',(e)=>{
-    if(e.target!==canvas&&e.target!==canvasContainer)return;
-    if(state.mode!=='select')return;
-    selectStart=canvasPoint(e.clientX,e.clientY);
-    selectionBox=document.createElement('div');
-    selectionBox.className='selection-box';
-    canvas.appendChild(selectionBox);
-    const move=(me)=>{
-      const p=canvasPoint(me.clientX,me.clientY);
-      const x=Math.min(selectStart.x,p.x),y=Math.min(selectStart.y,p.y);
-      const w=Math.abs(selectStart.x-p.x),h=Math.abs(selectStart.y-p.y);
-      Object.assign(selectionBox.style,{left:x+'px',top:y+'px',width:w+'px',height:h+'px'});
-    };
-    const up=(me)=>{
-      const rect=selectionBox.getBoundingClientRect();
-      clearSelection();
-      $$('.board-card,.board-text').forEach(el=>{
-        const r=el.getBoundingClientRect();
-        if(!(r.right<rect.left||r.left>rect.right||r.bottom<rect.top||r.top>rect.bottom)){
-          state.selected.push(el.dataset.id);el.classList.add('selected');
-        }
-      });
-      updateSelectionHint();
-      selectionBox.remove();selectionBox=null;
-      document.removeEventListener('mousemove',move);document.removeEventListener('mouseup',up);
-    };
-    document.addEventListener('mousemove',move);
-    document.addEventListener('mouseup',up);
-  });
 
   boot();
 
