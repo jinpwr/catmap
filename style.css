@@ -19,34 +19,9 @@
   --radius-sm: 6px;
   --shadow: 0 4px 24px rgba(0,0,0,0.45), 0 1px 4px rgba(0,0,0,0.3);
   --shadow-lg: 0 12px 48px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4);
-  --font: 'DM Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
-  --mono: 'DM Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  --font: 'DM Sans', system-ui, sans-serif;
+  --mono: 'DM Mono', 'Fira Code', monospace;
   --toolbar-w: 72px;
-}
-
-/* ── Light Mode ── */
-body.light-mode {
-  --bg: #f0f0f4;
-  --bg2: #e8e8ed;
-  --surface: #ffffff;
-  --surface2: #f4f4f8;
-  --border: rgba(0,0,0,0.08);
-  --border-strong: rgba(0,0,0,0.14);
-  --text: #1a1a2e;
-  --text-dim: #555566;
-  --text-faint: #9999aa;
-  --accent: #3366ff;
-  --accent-glow: rgba(51,102,255,0.15);
-  --shadow: 0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08);
-  --shadow-lg: 0 12px 48px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1);
-}
-
-body.light-mode #canvas-container {
-  background-image:
-    radial-gradient(circle, rgba(0,0,0,0.12) 1px, transparent 1px),
-    radial-gradient(circle at 50% 50%, rgba(51,102,255,0.04) 0%, transparent 60%);
-  background-size: 28px 28px, 100% 100%;
-  background-color: var(--bg);
 }
 
 html, body {
@@ -94,7 +69,6 @@ html, body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-dim);
-  font-family: var(--mono);
 }
 
 .toolbar-divider {
@@ -128,7 +102,6 @@ html, body {
   cursor: pointer;
   transition: all 0.15s ease;
   position: relative;
-  font-family: var(--mono);
 }
 
 .tool-btn:hover {
@@ -155,7 +128,6 @@ html, body {
   letter-spacing: 0.02em;
   text-transform: uppercase;
   line-height: 1;
-  font-family: var(--mono);
 }
 
 /* Color group */
@@ -193,7 +165,6 @@ html, body {
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
   transition: all 0.15s;
-  font-family: var(--mono);
 }
 .custom-color-label:hover { background: var(--surface2); color: var(--text); border-color: var(--border); }
 
@@ -222,41 +193,11 @@ html, body {
   box-shadow: var(--shadow);
   backdrop-filter: blur(16px);
   white-space: nowrap;
-  font-family: var(--mono);
 }
 
 #status-mode { color: var(--accent); font-weight: 500; }
 #status-zoom { font-family: var(--mono); font-size: 11px; }
 #status-hint { color: var(--text-faint); }
-
-/* ── Export PDF Button ── */
-#export-pdf-btn {
-  position: fixed;
-  top: 14px;
-  right: 14px;
-  z-index: 1001;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  padding: 8px 16px;
-  font-family: var(--mono);
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--text-dim);
-  cursor: pointer;
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(16px);
-  transition: all 0.15s ease;
-  letter-spacing: 0.03em;
-}
-#export-pdf-btn:hover {
-  background: var(--surface2);
-  color: var(--text);
-  border-color: var(--border-strong);
-}
 
 /* ── Context Menu ── */
 #context-menu {
@@ -270,7 +211,6 @@ html, body {
   z-index: 9999;
   backdrop-filter: blur(20px);
   animation: ctx-appear 0.12s ease;
-  font-family: var(--mono);
 }
 
 @keyframes ctx-appear {
@@ -290,8 +230,8 @@ html, body {
   border: none;
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-family: var(--mono);
-  font-size: 12px;
+  font-family: var(--font);
+  font-size: 13px;
   cursor: pointer;
   transition: background 0.1s;
   text-align: left;
@@ -320,8 +260,7 @@ html, body {
   border: 1px solid rgba(79,127,255,0.4);
   border-radius: 999px;
   padding: 8px 16px;
-  font-size: 12px;
-  font-family: var(--mono);
+  font-size: 13px;
   color: #a0b4ff;
   backdrop-filter: blur(16px);
   box-shadow: 0 4px 20px rgba(79,127,255,0.2);
@@ -340,8 +279,8 @@ html, body {
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 999px;
   color: inherit;
-  font-family: var(--mono);
-  font-size: 11px;
+  font-family: var(--font);
+  font-size: 12px;
   padding: 3px 10px;
   cursor: pointer;
   margin-left: 8px;
@@ -388,7 +327,6 @@ html, body {
   flex-direction: column;
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
   overflow: visible;
-  cursor: grab;
 }
 
 .board-card:hover {
@@ -415,7 +353,6 @@ html, body {
   align-items: flex-start;
   gap: 8px;
   flex-shrink: 0;
-  cursor: grab;
 }
 
 .card-header-dot {
@@ -429,7 +366,7 @@ html, body {
 }
 
 .card-title {
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--text);
   outline: none;
@@ -438,7 +375,7 @@ html, body {
   resize: none;
   width: 100%;
   line-height: 1.4;
-  font-family: var(--mono);
+  font-family: var(--font);
   min-height: 20px;
 }
 
@@ -456,7 +393,6 @@ html, body {
   border-bottom: 1px solid var(--border);
   min-height: 34px;
   flex-shrink: 0;
-  align-items: center;
 }
 
 .card-tag {
@@ -483,12 +419,12 @@ html, body {
 .card-body {
   flex: 1;
   padding: 10px 14px 12px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--text-dim);
   outline: none;
   line-height: 1.6;
   min-height: 60px;
-  font-family: var(--mono);
+  font-family: var(--font);
 }
 
 .card-body:empty::before {
@@ -538,8 +474,8 @@ html, body {
   color: var(--text);
   outline: none;
   line-height: 1.5;
-  font-family: var(--mono);
-  cursor: grab;
+  font-family: var(--font);
+  cursor: text;
   transition: border-color 0.15s, box-shadow 0.15s;
   white-space: pre-wrap;
   word-break: break-word;
@@ -568,20 +504,17 @@ html, body {
   font-style: italic;
 }
 
-/* ── Drag feedback — centered pink shadow ── */
-.board-card.dragging,
-.board-text.dragging {
-  opacity: 0.92;
-  cursor: grabbing;
-  box-shadow:
-    0 0 0 2px rgba(255,105,180,0.4),
-    0 8px 40px rgba(255,105,180,0.35),
-    0 2px 12px rgba(255,105,180,0.25);
-}
-
 /* ── LeaderLine overrides ── */
 .leader-line {
   z-index: 500 !important;
+}
+
+/* ── Drag feedback ── */
+.board-card.dragging,
+.board-text.dragging {
+  opacity: 0.9;
+  box-shadow: var(--shadow-lg), 0 20px 60px rgba(0,0,0,0.4);
+  transform-origin: center;
 }
 
 /* ── Scrollbar ── */

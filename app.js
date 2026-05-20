@@ -1,5 +1,6 @@
 /* ═══════════════════════════════════════════════════════════
-   Boardflow — app.js  (updated)
+   Boardflow — app.js
+   Infinite whiteboard with cards, text, connections
    ═══════════════════════════════════════════════════════════ */
 
 (function () {
@@ -12,12 +13,12 @@
 
   /* ── State ── */
   const state = {
-    elements: {},
-    connections: [],
-    mode: 'select',
-    selected: [],
-    lineInstances: {},
-    connectStep: 0,
+    elements: {},   // id → { type, x, y, w, h, color, content, tags, title }
+    connections: [], // [{ id, fromId, toId }]
+    mode: 'select', // select | card | text | line
+    selected: [],   // selected element ids
+    lineInstances: {}, // connId → LeaderLine instance
+    connectStep: 0, // 0=none, 1=first, 2=done
     connectFirst: null,
     panzoom: null,
     activeColor: '#4F7FFF',
@@ -48,6 +49,7 @@
     });
     state.panzoom = pz;
 
+    // Wheel zoom
     canvasContainer.addEventListener('wheel', (e) => {
       e.preventDefault();
       pz.zoomWithWheel(e);
@@ -55,6 +57,7 @@
       scheduleLineUpdate();
     }, { passive: false });
 
+    // Middle-click / Space+drag panning
     let spaceDown = false;
     let midDrag = false;
     let midStart = null;
@@ -114,8 +117,11 @@
   ════════════════════════════════════ */
   canvasContainer.addEventListener('click', (e) => {
     if (e.target !== canvasContainer && e.target !== canvas) return;
-    if (state.mode === 'select') { clearSelection(); return; }
-    if (state.mode === 'line') return;
+    if (state.mode === 'select') {
+      clearSelection();
+      return;
+    }
+    if (state.mode === 'line') return; // handled by connection mode
     const pos = canvasPoint(e.clientX, e.clientY);
     if (state.mode === 'card') spawnCard(pos.x, pos.y);
     if (state.mode === 'text') spawnText(pos.x, pos.y);
@@ -168,6 +174,7 @@
   });
   $('#btn-line').addEventListener('click', () => setMode('line'));
 
+  // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
     if (e.target.isContentEditable || e.target.tagName === 'INPUT') return;
     if (e.key === 'v' || e.key === 'V') setMode('select');
@@ -184,99 +191,6 @@
   });
 
   /* ════════════════════════════════════
-     LIGHT / DARK MODE TOGGLE
-  ════════════════════════════════════ */
-  let isLightMode = false;
-  const themeIconDark = $('#theme-icon-dark');
-  const themeIconLight = $('#theme-icon-light');
-  const themeLabel = $('#theme-label');
-
-  $('#btn-theme').addEventListener('click', () => {
-    isLightMode = !isLightMode;
-    document.body.classList.toggle('light-mode', isLightMode);
-    if (isLightMode) {
-      themeIconDark.style.display = 'none';
-      themeIconLight.style.display = '';
-      themeLabel.textContent = 'Dark';
-    } else {
-      themeIconDark.style.display = '';
-      themeIconLight.style.display = 'none';
-      themeLabel.textContent = 'Light';
-    }
-  });
-
-  /* ════════════════════════════════════
-     EXPORT AS PDF
-  ════════════════════════════════════ */
-  $('#export-pdf-btn').addEventListener('click', async () => {
-    const btn = $('#export-pdf-btn');
-    const origText = btn.innerHTML;
-    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 2"/></svg> Exporting…`;
-    btn.disabled = true;
-
-    try {
-      // Temporarily show the canvas at scale 1 for capture
-      const pz = state.panzoom;
-      const scale = pz.getScale();
-      const pan = pz.getPan();
-
-      // Find bounding box of all elements
-      const els = Object.values(state.elements);
-      if (els.length === 0) { alert('Nothing to export!'); return; }
-
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      els.forEach(s => {
-        minX = Math.min(minX, s.x);
-        minY = Math.min(minY, s.y);
-        maxX = Math.max(maxX, s.x + (s.w || 240));
-        maxY = Math.max(maxY, s.y + (s.h || 160));
-      });
-      const padding = 60;
-      minX -= padding; minY -= padding; maxX += padding; maxY += padding;
-      const bw = maxX - minX, bh = maxY - minY;
-
-      // Pan/zoom canvas to fit the bounding box in the viewport
-      const vw = canvasContainer.clientWidth;
-      const vh = canvasContainer.clientHeight;
-      const fitScale = Math.min(vw / bw, vh / bh, 1.5);
-      pz.zoom(fitScale, { animate: false });
-      pz.pan(-minX * fitScale + (vw - bw * fitScale) / 2, -minY * fitScale + (vh - bh * fitScale) / 2, { animate: false });
-      scheduleLineUpdate();
-
-      await new Promise(r => setTimeout(r, 400));
-
-      const captureEl = canvasContainer;
-      const canvasEl = await html2canvas(captureEl, {
-        backgroundColor: isLightMode ? '#f0f0f4' : '#0f0f11',
-        scale: 2,
-        useCORS: true,
-        logging: false,
-      });
-
-      // Restore pan/zoom
-      pz.zoom(scale, { animate: false });
-      pz.pan(pan.x, pan.y, { animate: false });
-      scheduleLineUpdate();
-
-      const imgData = canvasEl.toDataURL('image/png');
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({
-        orientation: canvasEl.width > canvasEl.height ? 'landscape' : 'portrait',
-        unit: 'px',
-        format: [canvasEl.width, canvasEl.height],
-      });
-      pdf.addImage(imgData, 'PNG', 0, 0, canvasEl.width, canvasEl.height);
-      pdf.save('boardflow-export.pdf');
-    } catch (err) {
-      console.error('PDF export failed:', err);
-      alert('PDF export failed. See console for details.');
-    } finally {
-      btn.innerHTML = origText;
-      btn.disabled = false;
-    }
-  });
-
-  /* ════════════════════════════════════
      SPAWN CARD
   ════════════════════════════════════ */
   function spawnCard(x, y, data = null) {
@@ -287,13 +201,9 @@
       w: 240, h: 160,
       color: state.activeColor,
       title: '',
-      tags: [],
+      tags: '',
       content: '',
     };
-    // Migrate old string tags to array
-    if (typeof elData.tags === 'string') {
-      elData.tags = elData.tags ? elData.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
-    }
     if (!data) state.elements[id] = elData;
 
     const el = document.createElement('div');
@@ -306,21 +216,19 @@
         <div class="card-header-dot" style="background:${elData.color}"></div>
         <div class="card-title" contenteditable="true" spellcheck="false">${escHtml(elData.title)}</div>
       </div>
-      <div class="card-tags" data-tags-container></div>
+      <div class="card-tags">
+        <span class="card-tag" contenteditable="true" spellcheck="false">${escHtml(elData.tags)}</span>
+      </div>
       <div class="card-body no-pan" contenteditable="true" spellcheck="false">${escHtml(elData.content)}</div>
       <div class="resize-handle" data-resize="true"></div>
     `;
 
     canvas.appendChild(el);
-
-    // Render tags
-    renderTags(el, elData.tags);
-
     setupCardInteract(el);
     setupCardEvents(el);
 
-    // Title & body events
-    el.querySelectorAll('.card-title, .card-body').forEach(ed => {
+    // Inline editing: don't select element on content click
+    el.querySelectorAll('[contenteditable]').forEach(ed => {
       ed.addEventListener('mousedown', e => e.stopPropagation());
       ed.addEventListener('click', e => e.stopPropagation());
       ed.addEventListener('input', () => saveElementContent(id));
@@ -330,116 +238,9 @@
     return el;
   }
 
-  /* ── TAG RENDERING & COMMA-SPLIT ── */
-  function renderTags(cardEl, tagsArr) {
-    const container = cardEl.querySelector('[data-tags-container]');
-    container.innerHTML = '';
-
-    tagsArr.forEach((tag, i) => {
-      const span = makeTagEl(tag);
-      container.appendChild(span);
-      setupTagEvents(span, cardEl, i);
-    });
-
-    // Add placeholder tag for new input
-    const addTag = makeTagEl('');
-    container.appendChild(addTag);
-    setupTagEvents(addTag, cardEl, tagsArr.length);
+  function colorToHeaderBg(color) {
+    return hexToRgba(color, 0.12);
   }
-
-  function makeTagEl(text) {
-    const span = document.createElement('span');
-    span.className = 'card-tag';
-    span.contentEditable = 'true';
-    span.spellcheck = false;
-    span.innerText = text;
-    return span;
-  }
-
-  function setupTagEvents(span, cardEl, idx) {
-    span.addEventListener('mousedown', e => e.stopPropagation());
-    span.addEventListener('click', e => e.stopPropagation());
-
-    span.addEventListener('keydown', (e) => {
-      if (e.key === ',') {
-        e.preventDefault();
-        const val = span.innerText.trim();
-        if (val) {
-          commitTagInput(cardEl, span, val);
-        }
-      }
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        span.blur();
-      }
-      if ((e.key === 'Backspace') && span.innerText === '') {
-        e.preventDefault();
-        deleteTagEl(cardEl, span);
-      }
-    });
-
-    span.addEventListener('blur', () => {
-      const val = span.innerText.trim();
-      // If empty and not the only tag, remove it (unless it's the placeholder)
-      const id = cardEl.dataset.id;
-      const s = state.elements[id];
-      if (!s) return;
-      const allTags = [...cardEl.querySelectorAll('[data-tags-container] .card-tag')];
-      const myIdx = allTags.indexOf(span);
-      if (val === '' && myIdx < s.tags.length) {
-        // It was an existing tag now cleared — remove it
-        s.tags.splice(myIdx, 1);
-        renderTags(cardEl, s.tags);
-      } else if (val !== '' && myIdx >= s.tags.length) {
-        // It was the placeholder with text — add as new tag
-        s.tags.push(val);
-        renderTags(cardEl, s.tags);
-      } else if (val !== '') {
-        // Update existing
-        s.tags[myIdx] = val;
-      }
-      saveState();
-    });
-  }
-
-  function commitTagInput(cardEl, span, val) {
-    const id = cardEl.dataset.id;
-    const s = state.elements[id];
-    if (!s) return;
-    const allTags = [...cardEl.querySelectorAll('[data-tags-container] .card-tag')];
-    const myIdx = allTags.indexOf(span);
-    if (myIdx >= s.tags.length) {
-      s.tags.push(val);
-    } else {
-      s.tags[myIdx] = val;
-    }
-    renderTags(cardEl, s.tags);
-    // Focus the new placeholder tag
-    const newPlaceholder = cardEl.querySelector('[data-tags-container] .card-tag:last-child');
-    if (newPlaceholder) {
-      setTimeout(() => newPlaceholder.focus(), 0);
-    }
-    saveState();
-  }
-
-  function deleteTagEl(cardEl, span) {
-    const id = cardEl.dataset.id;
-    const s = state.elements[id];
-    if (!s) return;
-    const allTags = [...cardEl.querySelectorAll('[data-tags-container] .card-tag')];
-    const myIdx = allTags.indexOf(span);
-    if (myIdx < s.tags.length) {
-      s.tags.splice(myIdx, 1);
-      renderTags(cardEl, s.tags);
-      // Focus previous tag or placeholder
-      const newTags = [...cardEl.querySelectorAll('[data-tags-container] .card-tag')];
-      const focusEl = newTags[Math.max(0, myIdx - 1)] || newTags[0];
-      if (focusEl) setTimeout(() => focusEl.focus(), 0);
-    }
-    saveState();
-  }
-
-  function colorToHeaderBg(color) { return hexToRgba(color, 0.12); }
 
   function hexToRgba(hex, alpha) {
     const r = parseInt(hex.slice(1,3), 16);
@@ -460,7 +261,7 @@
     if (!s) return;
     if (s.type === 'card') {
       s.title = el.querySelector('.card-title')?.innerText || '';
-      // tags are saved via tag events
+      s.tags = el.querySelector('.card-tag')?.innerText || '';
       s.content = el.querySelector('.card-body')?.innerText || '';
     } else if (s.type === 'text') {
       s.content = el.innerText || '';
@@ -494,6 +295,8 @@
     setupTextInteract(el);
     setupTextEvents(el);
 
+    el.addEventListener('mousedown', e => e.stopPropagation());
+    el.addEventListener('click', e => e.stopPropagation());
     el.addEventListener('input', () => saveElementContent(id));
     el.addEventListener('blur', () => saveElementContent(id));
 
@@ -505,71 +308,32 @@
 
   /* ════════════════════════════════════
      INTERACT.JS — DRAG & RESIZE
-     Cards: draggable from ANYWHERE (including contenteditable areas)
-     using a mousedown→mousemove manual drag approach for full-element drag
   ════════════════════════════════════ */
   function setupCardInteract(el) {
     const id = el.dataset.id;
 
-    // Manual full-card drag (ignores nothing — even contenteditable regions)
-    let dragging = false;
-    let dragStartClient = null;
-    let dragStartPos = null;
-    let clickNotDrag = false;
-
-    el.addEventListener('mousedown', (e) => {
-      // Ignore resize handle
-      if (e.target.dataset && e.target.dataset.resize) return;
-      // Don't initiate drag if user is clicking into a focused editable area already focused
-      if (e.target.isContentEditable && document.activeElement === e.target) return;
-
-      dragStartClient = { x: e.clientX, y: e.clientY };
-      const s = state.elements[id];
-      dragStartPos = { x: s.x, y: s.y };
-      clickNotDrag = true;
-
-      const onMove = (me) => {
-        const dx = me.clientX - dragStartClient.x;
-        const dy = me.clientY - dragStartClient.y;
-        if (!dragging && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
-          dragging = true;
-          clickNotDrag = false;
-          el.classList.add('dragging');
-          bringToFront(el);
-          // Blur any focused editable inside so it stops being editable mid-drag
-          const focused = el.querySelector(':focus');
-          if (focused) focused.blur();
-        }
-        if (dragging) {
-          const scale = state.panzoom.getScale();
-          const s = state.elements[id];
-          s.x = dragStartPos.x + dx / scale;
-          s.y = dragStartPos.y + dy / scale;
-          el.style.left = s.x + 'px';
-          el.style.top = s.y + 'px';
-          scheduleLineUpdate();
-        }
-      };
-
-      const onUp = () => {
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
-        if (dragging) {
-          el.classList.remove('dragging');
-          dragging = false;
-          saveState();
-          scheduleLineUpdate();
-        }
-        dragStartClient = null;
-        dragStartPos = null;
-      };
-
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
-    });
-
-    // Resize via interact
     interact(el)
+      .draggable({
+        ignoreFrom: '[contenteditable], .resize-handle',
+        listeners: {
+          start() { el.classList.add('dragging'); bringToFront(el); },
+          move(e) {
+            const s = state.elements[id];
+            if (!s) return;
+            const scale = state.panzoom.getScale();
+            s.x += e.dx / scale;
+            s.y += e.dy / scale;
+            el.style.left = s.x + 'px';
+            el.style.top = s.y + 'px';
+            scheduleLineUpdate();
+          },
+          end() {
+            el.classList.remove('dragging');
+            saveState();
+            scheduleLineUpdate();
+          },
+        },
+      })
       .resizable({
         edges: { right: true, bottom: true, bottomRight: '.resize-handle' },
         listeners: {
@@ -591,53 +355,27 @@
   function setupTextInteract(el) {
     const id = el.dataset.id;
 
-    let dragging = false;
-    let dragStartClient = null;
-    let dragStartPos = null;
-
-    el.addEventListener('mousedown', (e) => {
-      if (document.activeElement === el) return; // already editing
-
-      dragStartClient = { x: e.clientX, y: e.clientY };
-      const s = state.elements[id];
-      dragStartPos = { x: s.x, y: s.y };
-
-      const onMove = (me) => {
-        const dx = me.clientX - dragStartClient.x;
-        const dy = me.clientY - dragStartClient.y;
-        if (!dragging && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
-          dragging = true;
-          el.classList.add('dragging');
-          bringToFront(el);
-          el.blur();
-        }
-        if (dragging) {
-          const scale = state.panzoom.getScale();
-          const s = state.elements[id];
-          s.x = dragStartPos.x + dx / scale;
-          s.y = dragStartPos.y + dy / scale;
-          el.style.left = s.x + 'px';
-          el.style.top = s.y + 'px';
-          scheduleLineUpdate();
-        }
-      };
-
-      const onUp = () => {
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
-        if (dragging) {
-          el.classList.remove('dragging');
-          dragging = false;
-          saveState();
-          scheduleLineUpdate();
-        }
-        dragStartClient = null;
-        dragStartPos = null;
-      };
-
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
-    });
+    interact(el)
+      .draggable({
+        ignoreFrom: '[contenteditable]',
+        listeners: {
+          start() { el.classList.add('dragging'); bringToFront(el); },
+          move(e) {
+            const s = state.elements[id];
+            if (!s) return;
+            const scale = state.panzoom.getScale();
+            s.x += e.dx / scale;
+            s.y += e.dy / scale;
+            el.style.left = s.x + 'px';
+            el.style.top = s.y + 'px';
+            scheduleLineUpdate();
+          },
+          end() {
+            el.classList.remove('dragging');
+            saveState();
+          },
+        },
+      });
   }
 
   /* ════════════════════════════════════
@@ -645,7 +383,7 @@
   ════════════════════════════════════ */
   function setupCardEvents(el) {
     el.addEventListener('mousedown', (e) => {
-      if (e.target.dataset && e.target.dataset.resize) return;
+      if (e.target.isContentEditable || e.target.dataset.resize) return;
       handleElementClick(el, e);
     });
     el.addEventListener('contextmenu', (e) => {
@@ -679,6 +417,7 @@
     }
 
     if (e.shiftKey) {
+      // Multi-select
       if (state.selected.includes(id)) {
         state.selected = state.selected.filter(s => s !== id);
         el.classList.remove('selected');
@@ -689,6 +428,7 @@
         }
       }
     } else {
+      // Single select
       clearSelection();
       state.selected = [id];
       el.classList.add('selected');
@@ -730,30 +470,45 @@
     contextMenu.style.left = x + 'px';
     contextMenu.style.top = y + 'px';
     contextMenu.classList.remove('hidden');
+
     const canConnect = state.selected.length === 2;
     $('#ctx-connect').style.display = canConnect ? '' : 'none';
+
+    // Close on outside click
     setTimeout(() => {
       document.addEventListener('click', hideContextMenu, { once: true });
     }, 0);
   }
 
-  function hideContextMenu() { contextMenu.classList.add('hidden'); }
+  function hideContextMenu() {
+    contextMenu.classList.add('hidden');
+  }
 
   $('#ctx-connect').addEventListener('click', () => {
     hideContextMenu();
-    if (state.selected.length === 2) createConnection(state.selected[0], state.selected[1]);
+    if (state.selected.length === 2) {
+      createConnection(state.selected[0], state.selected[1]);
+    }
   });
-  $('#ctx-delete').addEventListener('click', () => { hideContextMenu(); deleteSelected(); });
-  $('#ctx-cancel').addEventListener('click', () => { hideContextMenu(); });
+
+  $('#ctx-delete').addEventListener('click', () => {
+    hideContextMenu();
+    deleteSelected();
+  });
+
+  $('#ctx-cancel').addEventListener('click', () => {
+    hideContextMenu();
+  });
 
   /* ════════════════════════════════════
-     CONNECTION MODE
+     CONNECTION MODE (Line button)
   ════════════════════════════════════ */
   function startConnectionMode() {
     state.connectStep = 1;
     state.connectFirst = null;
     canvasContainer.classList.add('connect-mode');
     connectionOverlay.classList.remove('hidden');
+    connectionBanner.textContent = '';
     connectionBanner.innerHTML = `
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
         <circle cx="3" cy="3" r="2" fill="currentColor" opacity="0.7"/>
@@ -802,10 +557,12 @@
      LEADER LINE CONNECTIONS
   ════════════════════════════════════ */
   function createConnection(fromId, toId) {
+    // Avoid duplicate
     const exists = state.connections.find(
       c => (c.fromId === fromId && c.toId === toId) || (c.fromId === toId && c.toId === fromId)
     );
     if (exists) return;
+
     const connId = uid();
     state.connections.push({ id: connId, fromId, toId, color: state.activeColor });
     drawLine(connId, fromId, toId, state.activeColor);
@@ -816,10 +573,13 @@
     const fromEl = canvas.querySelector(`[data-id="${fromId}"]`);
     const toEl = canvas.querySelector(`[data-id="${toId}"]`);
     if (!fromEl || !toEl) return;
+
+    // Remove existing if any
     if (state.lineInstances[connId]) {
       try { state.lineInstances[connId].remove(); } catch(e) {}
       delete state.lineInstances[connId];
     }
+
     try {
       const line = new LeaderLine(fromEl, toEl, {
         color: color || '#4F7FFF',
@@ -829,10 +589,13 @@
         endPlug: 'arrow2',
         startPlugSize: 1.5,
         endPlugSize: 1.8,
+        gradient: false,
         dropShadow: { dx: 0, dy: 1, blur: 4, color: 'rgba(0,0,0,0.3)' },
       });
       state.lineInstances[connId] = line;
-    } catch (e) { console.warn('LeaderLine error:', e); }
+    } catch (e) {
+      console.warn('LeaderLine error:', e);
+    }
   }
 
   function redrawAllLines() {
@@ -881,7 +644,10 @@
 
   $('#btn-clear').addEventListener('click', () => {
     if (!confirm('Clear the entire board? This cannot be undone.')) return;
-    Object.values(state.lineInstances).forEach(line => { try { line.remove(); } catch(e) {} });
+    // Remove all lines
+    Object.values(state.lineInstances).forEach(line => {
+      try { line.remove(); } catch(e) {}
+    });
     state.lineInstances = {};
     state.connections = [];
     state.elements = {};
@@ -910,13 +676,16 @@
     });
   });
 
-  function clearSwatchActive() { $$('.swatch').forEach(s => s.classList.remove('active-swatch')); }
+  function clearSwatchActive() {
+    $$('.swatch').forEach(s => s.classList.remove('active-swatch'));
+  }
 
   function applyColorToSelected(color) {
     state.selected.forEach(id => {
       const s = state.elements[id];
       if (!s) return;
       s.color = color;
+
       if (s.type === 'card') {
         const el = canvas.querySelector(`[data-id="${id}"]`);
         if (el) {
@@ -928,6 +697,8 @@
         if (el) el.style.color = color;
       }
     });
+
+    // Also color selected connections
     state.connections.forEach(conn => {
       if (state.selected.includes(conn.fromId) || state.selected.includes(conn.toId)) {
         conn.color = color;
@@ -936,20 +707,25 @@
         }
       }
     });
+
     saveState();
   }
 
   /* ════════════════════════════════════
-     PERSISTENCE
+     PERSISTENCE (localStorage)
   ════════════════════════════════════ */
-  const STORAGE_KEY = 'boardflow_v3';
+  const STORAGE_KEY = 'boardflow_v2';
 
   function saveState() {
     const data = {
       elements: state.elements,
       connections: state.connections.map(c => ({ id: c.id, fromId: c.fromId, toId: c.toId, color: c.color })),
     };
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) {}
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch(e) {
+      console.warn('localStorage save failed:', e);
+    }
   }
 
   function loadState() {
@@ -957,6 +733,7 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const data = JSON.parse(raw);
+
       if (data.elements) {
         Object.entries(data.elements).forEach(([id, el]) => {
           state.elements[id] = el;
@@ -964,13 +741,16 @@
           if (el.type === 'text') spawnText(0, 0, el);
         });
       }
+
       if (data.connections) {
         data.connections.forEach(conn => {
           state.connections.push(conn);
           setTimeout(() => drawLine(conn.id, conn.fromId, conn.toId, conn.color), 100);
         });
       }
-    } catch(e) { console.warn('localStorage load failed:', e); }
+    } catch(e) {
+      console.warn('localStorage load failed:', e);
+    }
   }
 
   /* ════════════════════════════════════
@@ -981,22 +761,27 @@
     loadState();
     setMode('select');
 
+    // Center the panzoom view on initial canvas midpoint
     const pz = state.panzoom;
     const rect = canvasContainer.getBoundingClientRect();
     pz.pan(rect.width / 2 - 2000, rect.height / 2 - 2000, { animate: false });
 
+    // If empty, show a welcome card
     if (Object.keys(state.elements).length === 0) {
       setTimeout(() => {
-        const cx = 2000, cy = 2000;
+        const cx = 2000;
+        const cy = 2000;
         const welcomeId = uid();
         const s = {
           id: welcomeId,
           type: 'card',
-          x: cx - 130, y: cy - 90,
-          w: 280, h: 200,
+          x: cx - 130,
+          y: cy - 90,
+          w: 280,
+          h: 200,
           color: '#4F7FFF',
           title: 'Welcome to Boardflow',
-          tags: ['start', 'here'],
+          tags: 'start here',
           content: 'Drag to move · Scroll to zoom · V/C/T/L for tools',
         };
         state.elements[welcomeId] = s;
@@ -1005,6 +790,7 @@
       }, 200);
     }
 
+    // Continuous line update during any animation
     setInterval(redrawAllLines, 200);
   }
 
