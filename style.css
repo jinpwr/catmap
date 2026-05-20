@@ -301,7 +301,7 @@ html, body {
   white-space: nowrap;
 }
 #status-mode { color: var(--accent); font-weight: 600; font-size: 11px; }
-#status-zoom { font-family: var(--font-mono); font-size: 10.5px; }
+#status-zoom { font-family: var(--font-sf); font-size: 10.5px; }
 #status-hint { color: var(--text-faint); }
 
 /* ══════════════════════
@@ -506,22 +506,58 @@ html, body {
 }
 .card-tags:active { cursor: grabbing; }
 
-.card-tag {
-  font-family: var(--font-mono);
-  font-size: 9.5px;
+.card-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-sf);
+  font-size: 10px;
   font-weight: 500;
-  padding: 2px 7px;
+  padding: 2px 6px 2px 8px;
   background: rgba(255,255,255,0.055);
   border: 1px solid var(--border-strong);
   border-radius: 999px;
   color: var(--text-dim);
-  outline: none;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   white-space: nowrap;
-  cursor: text;
+  cursor: default;
+  user-select: none;
 }
-.card-tag:empty::before { content: '+ tag'; color: var(--text-faint); }
+
+.tag-remove {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  font-family: var(--font-sf);
+  transition: color 0.1s;
+}
+.tag-remove:hover { color: var(--danger); }
+
+.card-tag-input {
+  font-family: var(--font-sf);
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-dim);
+  outline: none;
+  min-width: 50px;
+  padding: 2px 4px;
+  cursor: text;
+  border-radius: 4px;
+}
+.card-tag-input:empty::before {
+  content: attr(placeholder);
+  color: var(--text-faint);
+  pointer-events: none;
+  font-style: italic;
+}
 
 .card-body {
   flex: 1;
@@ -624,8 +660,8 @@ html, body {
 ══════════════════════ */
 .board-card.dragging,
 .board-text.dragging {
-  opacity: 0.88;
-  box-shadow: var(--shadow-lg), 0 24px 60px rgba(0,0,0,0.35);
+  opacity: 0.92;
+  box-shadow: none;
   z-index: 500 !important;
   cursor: grabbing !important;
 }

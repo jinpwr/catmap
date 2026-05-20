@@ -531,13 +531,17 @@
     el.dataset.id = id;
     el.style.cssText = `left:${data.x}px;top:${data.y}px;width:${data.w}px;height:${data.h}px;`;
 
+    // Parse tags — stored as comma-separated string
+    const tagList = parseTags(data.tags || '');
+
     el.innerHTML = `
       <div class="card-header" style="background:${hexRgba(data.color,0.13)}">
         <div class="card-header-dot" style="background:${data.color}"></div>
         <div class="card-title no-pan" contenteditable="true" spellcheck="false">${esc(data.title)}</div>
       </div>
-      <div class="card-tags no-pan">
-        <span class="card-tag" contenteditable="true" spellcheck="false">${esc(data.tags)}</span>
+      <div class="card-tags no-pan" data-tag-area="true">
+        ${renderTagPills(tagList)}
+        <span class="card-tag-input" contenteditable="true" spellcheck="false" data-tag-input="true" placeholder="add tag…"></span>
       </div>
       <div class="card-body no-pan" contenteditable="true" spellcheck="false">${esc(data.content)}</div>
       <div class="resize-handle no-pan" data-resize="true"></div>`;
@@ -546,13 +550,93 @@
     setupElementDrag(el);
     setupCardResize(el);
     setupElementEvents(el);
+    setupTagInput(el, id);
 
-    el.querySelectorAll('[contenteditable]').forEach(ce => {
-      ce.addEventListener('input', () => syncData(id));
-      ce.addEventListener('blur', () => { syncData(id); saveCurrentBoard(); });
-    });
+    // title & body editing
+    el.querySelector('.card-title').addEventListener('input', () => syncData(id));
+    el.querySelector('.card-title').addEventListener('blur', () => { syncData(id); saveCurrentBoard(); });
+    el.querySelector('.card-body').addEventListener('input', () => syncData(id));
+    el.querySelector('.card-body').addEventListener('blur', () => { syncData(id); saveCurrentBoard(); });
 
     return el;
+  }
+
+  /* Tag helpers */
+  function parseTags(str) {
+    if (!str) return [];
+    return str.split(',').map(s => s.trim()).filter(Boolean);
+  }
+
+  function renderTagPills(tagList) {
+    return tagList.map(t =>
+      `<span class="card-tag-pill" data-tag-pill="true">${esc(t)}<button class="tag-remove" data-tag-remove="true" title="Remove">×</button></span>`
+    ).join('');
+  }
+
+  function setupTagInput(cardEl, id) {
+    const tagArea = cardEl.querySelector('[data-tag-area]');
+    const input   = cardEl.querySelector('[data-tag-input]');
+    if (!tagArea || !input) return;
+
+    // Prevent drag when clicking tag area
+    tagArea.addEventListener('mousedown', e => e.stopPropagation());
+    tagArea.addEventListener('click', e => {
+      e.stopPropagation();
+      // Remove tag pill
+      if (e.target.dataset.tagRemove) {
+        e.target.closest('.card-tag-pill').remove();
+        saveTagsToState(cardEl, id);
+        return;
+      }
+      // Focus input if clicking background of tag area
+      if (e.target === tagArea) input.focus();
+    });
+
+    input.addEventListener('mousedown', e => e.stopPropagation());
+    input.addEventListener('click', e => e.stopPropagation());
+
+    // Comma → create pill; Enter → create pill; Backspace on empty → remove last
+    input.addEventListener('keydown', e => {
+      if (e.key === ',' || e.key === 'Enter') {
+        e.preventDefault();
+        const val = input.innerText.replace(/,/g, '').trim();
+        if (val) {
+          const pill = document.createElement('span');
+          pill.className = 'card-tag-pill';
+          pill.dataset.tagPill = 'true';
+          pill.innerHTML = `${esc(val)}<button class="tag-remove" data-tag-remove="true" title="Remove">×</button>`;
+          tagArea.insertBefore(pill, input);
+        }
+        input.innerText = '';
+        saveTagsToState(cardEl, id);
+      } else if (e.key === 'Backspace' && !input.innerText) {
+        const pills = tagArea.querySelectorAll('.card-tag-pill');
+        if (pills.length > 0) {
+          pills[pills.length - 1].remove();
+          saveTagsToState(cardEl, id);
+        }
+      }
+    });
+
+    input.addEventListener('blur', () => {
+      const val = input.innerText.replace(/,/g, '').trim();
+      if (val) {
+        const pill = document.createElement('span');
+        pill.className = 'card-tag-pill';
+        pill.dataset.tagPill = 'true';
+        pill.innerHTML = `${esc(val)}<button class="tag-remove" data-tag-remove="true" title="Remove">×</button>`;
+        tagArea.insertBefore(pill, input);
+        input.innerText = '';
+      }
+      saveTagsToState(cardEl, id);
+      saveCurrentBoard();
+    });
+  }
+
+  function saveTagsToState(cardEl, id) {
+    const pills = cardEl.querySelectorAll('.card-tag-pill');
+    const tagStr = [...pills].map(p => p.childNodes[0].textContent.trim()).join(',');
+    if (S.elements[id]) S.elements[id].tags = tagStr;
   }
 
   /* ══════════════════════════════
@@ -602,7 +686,7 @@
 
     interact(el).draggable({
       // Only ignore resize handle; contenteditable areas drag unless they are focused
-      ignoreFrom: '.resize-handle',
+      ignoreFrom: '.resize-handle, [data-tag-input], [data-tag-remove], .card-tag-pill',
       // Allow dragging from contenteditable when not focused (i.e., mouse-down without focus)
       listeners: {
         start(event) {
@@ -746,8 +830,10 @@
     if (!s) return;
     if (s.type === 'card') {
       s.title   = el.querySelector('.card-title')?.innerText || '';
-      s.tags    = el.querySelector('.card-tag')?.innerText   || '';
       s.content = el.querySelector('.card-body')?.innerText  || '';
+      // tags read from pills
+      const pills = el.querySelectorAll('.card-tag-pill');
+      s.tags = [...pills].map(p => p.childNodes[0].textContent.trim()).join(',');
     } else {
       s.content = el.innerText || '';
     }
